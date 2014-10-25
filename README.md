@@ -17,11 +17,13 @@ You can also use _Anaconda_ directly, this python distribution will offer you al
 
 + ConvNet layer [20141021]
 + Original ConvNet Auto-encoder [20141021]
++ Tested for AWS GPU instance [20141025]
++ Example for classification [20141025]
 
 ##To-do
 
-+ Example for classification
 + Multiple activation function support
++ Support functions for ConvNet Layer and ConvNet AE
 + Sparse ConvNet Auto-encoder
 + Stacked ConvNet Auto-encoder
 
@@ -30,6 +32,8 @@ You can also use _Anaconda_ directly, this python distribution will offer you al
 + All experiment in this repo are conducted on GPU, in order to run it faster, you are suggested to have a GPU on your machine.
 
 + If you forked this repo, use and modifiy `update.sh` to avoid updating unnecessary files and data.
+
++ Tested on AWS GPU instance, the performance looks like Tesla K20C.
 
 ##Contacts
 

@@ -104,8 +104,9 @@ class ConvAE(object):
         learning_rate : float
             learning rate of sgd
         """
+        L=T.sum(T.pow(T.sub(self.get_reconstruction(), self.input),2), axis=1);
         
-        cost = 0.5*T.mean(T.pow(T.sub(self.recon_layer.output, self.input),2));
+        cost = 0.5*T.mean(L);
 
         grads=T.grad(cost, self.params);
         
