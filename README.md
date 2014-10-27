@@ -19,6 +19,7 @@ You can also use _Anaconda_ directly, this python distribution will offer you al
 + Original ConvNet Auto-encoder [20141021]
 + Tested for AWS GPU instance [20141025]
 + Example for classification [20141025]
++ Add some support functions for ConvNet Layer [20141027]
 
 ##To-do
 
@@ -37,9 +38,9 @@ You can also use _Anaconda_ directly, this python distribution will offer you al
 
 ##Contacts
 
-Hu Yuhuang  
-Advanced Robotic Lab  
-Department of Artificial Intelligence  
-Faculty of Computer Science & IT  
-University of Malaya  
+Hu Yuhuang
+Advanced Robotic Lab
+Department of Artificial Intelligence
+Faculty of Computer Science & IT
+University of Malaya
 Email: duguyue100@gmail.com

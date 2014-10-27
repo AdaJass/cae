@@ -16,7 +16,7 @@ import os, sys, time;
 try:
     import PIL.image as Image;
 except ImportError:
-    import Image; 
+    import Image;
 
 # public library modules
 
@@ -89,7 +89,7 @@ test_model=theano.function(
                                    x: test_set_x[index*batch_size:(index+1)*batch_size]
                                    }
                            );
-                        
+
 ## Validate model
 
 validate_model=theano.function(
@@ -118,10 +118,10 @@ start_time = time.clock();
 
 for epoch in xrange(n_epochs):
     c=[];
-    
+
     for batch_index in xrange(n_train_batches):
         c.append(train_model(batch_index));
-        
+
     print 'Training epoch %d, cost' % epoch, np.mean(c);
 
 end_time=time.clock();
@@ -145,54 +145,54 @@ image.save('data/filter_image.png')
 
 patience = 10000;
 patience_increase = 2;
- 
+
 improvement_threshold=0.995;
- 
+
 validation_frequency=min(n_train_batches, patience/2);
- 
+
 best_params=None;
- 
+
 best_validation_loss = np.inf;
 best_iter = 0;
 test_score = 0.;
 start_time = time.clock();
- 
+
 epoch = 0;
 done_looping = False;
- 
+
 while (epoch < n_epochs) and (not done_looping):
     epoch=epoch+1;
-     
+
     for minibatch_index in xrange(n_train_batches):
         iteration=(epoch-1)*n_train_batches+minibatch_index;
-         
+
         if iteration%100==0:
             print 'training @ iter =', iteration;
-             
+
         cost_ij=train_model(minibatch_index);
-         
+
         if (iteration + 1) % validation_frequency == 0:
-  
+
             # compute zero-one loss on validation set
             validation_losses = [validate_model(i) for i
                                  in xrange(n_valid_batches)]
             this_validation_loss = np.mean(validation_losses)
-            print('epoch %i, minibatch %i/%i, validation error %f %%' % 
+            print('epoch %i, minibatch %i/%i, validation error %f %%' %
                   (epoch, minibatch_index + 1, n_train_batches,
                    this_validation_loss * 100.))
-  
+
                 # if we got the best validation score until now
             if this_validation_loss < best_validation_loss:
-  
+
                     # improve patience if loss improvement is good enough
                 if this_validation_loss < best_validation_loss * \
                     improvement_threshold:
                     patience = max(patience, iteration * patience_increase)
-  
+
                     # save best validation score and iteration number
                     best_validation_loss = this_validation_loss
                     best_iter = iteration
-  
+
                     # test it on the test set
                     test_losses = [
                                    test_model(i)
@@ -200,15 +200,15 @@ while (epoch < n_epochs) and (not done_looping):
                                    ]
                     test_score = np.mean(test_losses)
                     print(('     epoch %i, minibatch %i/%i, test error of '
-                           'best model %f %%') % 
+                           'best model %f %%') %
                            (epoch, minibatch_index + 1, n_train_batches,
                             test_score * 100.))
-  
+
         if patience <= iteration:
             done_looping = True
             break
-         
- 
+
+
 end_time = time.clock();
 print('Optimization complete.');
 print('Best validation score of %f %% obtained at iteration %i,'
