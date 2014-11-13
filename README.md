@@ -38,9 +38,9 @@ You can also use _Anaconda_ directly, this python distribution will offer you al
 
 ##Contacts
 
-Hu Yuhuang
-Advanced Robotic Lab
-Department of Artificial Intelligence
-Faculty of Computer Science & IT
-University of Malaya
+Hu Yuhuang  
+Advanced Robotic Lab  
+Department of Artificial Intelligence  
+Faculty of Computer Science & IT  
+University of Malaya  
 Email: duguyue100@gmail.com

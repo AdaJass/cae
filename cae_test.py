@@ -28,6 +28,7 @@ import theano.tensor as T;
 
 from cae_tools import load_data;
 from conv_aes.ConvAE import ConvAE;
+from conv_aes.ConvAE import ConvRWAE;
 from dlt_utils import tile_raster_images;
 
 
@@ -72,11 +73,10 @@ print '... Building CAE model'
 
 data_in=x.reshape((batch_size, 1, 28, 28));
 
-CAE=ConvAE(rng,
-           data_in=data_in,
-           image_shape=(batch_size, 1, 28, 28),
-           filter_shape=(nkerns, 1, 14, 14)
-           )
+CAE=ConvRWAE(rng,
+             data_in=data_in,
+             image_shape=(batch_size, 1, 28, 28),
+             filter_shape=(nkerns, 1, 14, 14));
 
 cost, updates=CAE.get_cost_update(learning_rate=learning_rate);
 
@@ -129,17 +129,17 @@ end_time=time.clock();
 print 'Training is complete in %.2fm' % ((end_time-start_time)/60.);
 
 
-I=np.zeros((nkerns, 196));
-A=CAE.hidden_layer.W.get_value(borrow=True);
-for i in xrange(nkerns):
-    I[i,:]=A[i,:,:].flatten(1);
+#I=np.zeros((nkerns, 196));
+#A=CAE.hidden_layer.W.get_value(borrow=True);
+#for i in xrange(nkerns):
+#    I[i,:]=A[i,:,:].flatten(1);
 
-image = Image.fromarray(
-                        tile_raster_images(X=I,
-                        img_shape=(14, 14), tile_shape=(5, 10),
-                        tile_spacing=(2, 2))
-                        )
-image.save('data/filter_image.png')
+#image = Image.fromarray(
+#                        tile_raster_images(X=I,
+#                        img_shape=(14, 14), tile_shape=(5, 10),
+#                        tile_spacing=(2, 2))
+#                        )
+#image.save('data/filter_image.png')
 
 
 

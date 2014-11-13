@@ -19,6 +19,7 @@ from theano.tensor.signal import downsample;
 from theano.tensor.nnet import conv;
 
 from ConvNet import ConvNetLayer;
+from ConvNet import ConvNetRandomWeightsLayer;
 
 class ConvAE(object):
     """Convolutional Auto-encoder
@@ -114,5 +115,111 @@ class ConvAE(object):
                    (param_i, param_i-learning_rate*grad_i)
                    for param_i, grad_i in zip(self.params, grads)
                    ];
+           
+        return (cost, updates);
+
+class ConvRWAE(object):
+    """Convolutional Random Weights Auto-encoder
+
+    This class is to construct Convolutional Random Weights Auto-encoder.
+    """
+
+    def __init__(self,
+                 rng,
+                 data_in,
+                 image_shape,
+                 filter_shape,
+                 ):
+        """Initialize a Convolutional Random Weights Auto-encoder.
+
+        Parameters
+        ----------
+        rng : numpy.random.RandomState
+            a random number generator for initializing weights.
+            
+        data_in : theano.tensor.dtensor4
+            symbolic image tensor, of shape image_shape
+            
+        filter_shape : tuple or list of length 4
+            (number of filters, number of input feature maps,
+             filter height, filter width)
+        
+        image_shape : tuple or list of length 4
+            (batch size, number of input feature maps,
+             image height, image width)
+        """
+
+        self.input=data_in;
+        
+        hidden_layer=ConvNetRandomWeightsLayer(rng,
+                                               data_in=data_in,
+                                               image_shape=image_shape,
+                                               filter_shape=filter_shape,
+                                               border_mode='full');
+        
+        image_shape_temp=numpy.asarray(image_shape);
+        filter_shape_temp=numpy.asarray(filter_shape);
+        image_shape_hidden=(image_shape_temp[0],
+                            filter_shape_temp[0],
+                            image_shape_temp[2]+filter_shape_temp[2]-1,
+                            image_shape_temp[3]+filter_shape_temp[3]-1,);
+                            
+        filter_shape_hidden=(image_shape_temp[1],
+                             filter_shape_temp[0],
+                             filter_shape_temp[2],
+                             filter_shape_temp[3]);
+                             
+        recon_layer=ConvNetRandomWeightsLayer(rng,
+                                              data_in=hidden_layer.output,
+                                              image_shape=image_shape_hidden,
+                                              filter_shape=filter_shape_hidden,
+                                              border_mode='valid');
+                                 
+        self.hidden_layer=hidden_layer;
+        self.recon_layer=recon_layer;
+        
+        self.WEIGHTS=[self.hidden_layer.W, self.recon_layer.W];
+        self.BIAS=[self.hidden_layer.b, self.recon_layer.b];
+        self.RW=[self.hidden_layer.B, self.recon_layer.B];
+
+        self.params=self.WEIGHTS+self.BIAS;
+
+    def get_hidden_values(self):
+        """Get hidden layer's value
+        """
+        
+        return self.hidden_layer.output;
+        
+    def get_reconstruction(self):
+        """Get reconstruction of auto-encoder
+        """
+        
+        return self.recon_layer.output;
+    
+    def get_cost_update(self, learning_rate=0.1):
+        """Get cost updates
+        
+        Parameters
+        ----------
+        learning_rate : float
+            learning rate of sgd
+        """
+        L=T.sum(T.pow(T.sub(self.get_reconstruction(), self.input),2), axis=1);
+        cost = 0.5*T.mean(L);
+
+        #L_B=T.sum(T.pow(T.sub(self.recon_layer.output_B, self.input),2), axis=1);
+        #cost_B = 0.5*T.mean(L_B);
+
+        grad_weights=T.grad(cost, self.WEIGHTS);
+
+        updates_weights=[(param_i, param_i-learning_rate*(grad_i+learning_rate*rw_i))
+                        for param_i, grad_i, rw_i in zip(self.WEIGHTS, grad_weights, self.RW)];
+        
+        grad_bias=T.grad(cost, self.BIAS);
+
+        updates_bias=[(param_i, param_i-learning_rate*grad_i)
+                      for param_i, grad_i in zip(self.BIAS, grad_bias)];
+
+        updates=updates_weights+updates_bias;
            
         return (cost, updates);
