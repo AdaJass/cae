@@ -55,6 +55,10 @@ import theano.tensor as T;
 from theano.tensor.signal import downsample;
 from theano.tensor.nnet import conv;
 
+# private library
+
+import nntool as nnt;
+
 class ConvNetLayer(object):
     """ConvNet Layer
     
@@ -106,6 +110,8 @@ class ConvNetLayer(object):
             activation mode,
             "tanh" for tanh function;
             "relu" for ReLU function;
+            "sigmoid" for Sigmoid function;
+            "softplus" for Softplus function
         """
 
         assert image_shape[1] == filter_shape[1];
@@ -118,6 +124,21 @@ class ConvNetLayer(object):
         self.pool_size = pool_size;
         self.border_mode = border_mode;
         self.activate_mode = activate_mode;
+
+        if (self.activate_mode=="tanh"):
+            self.activation=nnt.tanh;
+            self.d_activation=nnt.d_tanh;
+        elif (self.activate_mode=="relu"):
+            self.activation=nnt.relu;
+        elif (self.activate_mode=="sigmoid"):
+            self.activation=nnt.sigmoid;
+            self.d_activation=nnt.d_sigmoid;
+        elif (self.activate_mode=="softplus"):
+            self.activation=nnt.softplus;
+            self.d_activation=nnt.d_softplus;
+        else:
+            raise ValueError("Value %s is not a valid choice of activation function"
+                             % self.activate_mode);
 
         ## Generate weights for each filters
         fan_in = numpy.prod(filter_shape[1:]);
@@ -139,18 +160,17 @@ class ConvNetLayer(object):
 
         ## Get network pool
 
-        self.pooled_out=self.getConvPool(data_in=self.input,
-                                         filters=self.W,
-                                         filter_shape=self.filter_shape,
-                                         image_shape=self.image_shape,
-                                         bias=self.b,
-                                         if_pool=if_pool,
-                                         pool_size=pool_size,
-                                         border_mode=border_mode);
+        self.pooled, self.pooled_out=self.getConvPool(data_in=self.input,
+                                                      filters=self.W,
+                                                      filter_shape=self.filter_shape,
+                                                      image_shape=self.image_shape,
+                                                      bias=self.b,
+                                                      if_pool=if_pool,
+                                                      pool_size=pool_size,
+                                                      border_mode=border_mode);
         
         ## Get network activation
-        self.output=self.getInputActivation(pooled_out=self.pooled_out,
-                                            activate_mode=self.activate_mode);
+        self.output=self.getInputActivation(pooled_out=self.pooled_out);
 
         self.params = [self.W, self.b];
         
@@ -208,68 +228,44 @@ class ConvNetLayer(object):
         else:
             pooled_out = conv_out;
             
-        return pooled_out+bias.dimshuffle('x', 0, 'x', 'x');
+        return pooled_out, pooled_out+bias.dimshuffle('x', 0, 'x', 'x');
+
+    def getCP(self,
+              data_in,
+              filters,
+              if_pool=False):
+        return self.getConvPool(data_in=data_in,
+                                filters=filters,
+                                filter_shape=self.filter_shape,
+                                image_shape=self.image_shape,
+                                bias=self.b,
+                                if_pool=if_pool,
+                                pool_size=self.pool_size,
+                                border_mode=self.border_mode);
         
     def getActivation(self,
-                      pooled_out,
-                      activate_mode='tanh'):
+                      pooled_out):
         """Get network activation based on activate mode
-        
-        Parameters
-        ----------
-        activation mode,
-            "tanh" for tanh function;
-            "relu" for ReLU function;
         """
                 
         ## Calculate network activation
-        if (activate_mode=='tanh'):
-            activation = T.tanh(pooled_out);
-        elif (activate_mode=='relu'):
-            activation = T.max(0.0, pooled_out);
-            
-        return activation;
+        act=self.activation(pooled_out);
+                    
+        return act;
     
     def getNetActivation(self,
-                         pooled_out,
-                         activate_mode='tanh'):
+                         pooled_out):
         """Get a trained ConvNet Layer's activation
-        
-        Notes
-        -----
-        the function is using self.W, self.filter_shape, self.image_shape,
-        and self.b as defined in __init__ function.
-        
-        Parameters
-        ----------
-        activation mode,
-            "tanh" for tanh function;
-            "relu" for ReLU function;
         """
         
-        return self.getActivation(pooled_out=pooled_out,
-                                  activate_mode=activate_mode);
+        return self.getActivation(pooled_out=pooled_out);
         
     def getInputActivation(self,
-                           pooled_out,
-                           activate_mode='tanh'):
+                           pooled_out):
         """Get network activation from self.input
-        
-        Notes
-        -----
-        data_in, filters (weights), filter_shape, image_shape and
-        bias are using parameters defined in __init__ method.
-        
-        Parameters
-        ----------        
-        activation mode,
-            "tanh" for tanh function;
-            "relu" for ReLU function;
-        
         """
         
-        return self.getActivation(pooled_out=pooled_out,
-                                  activate_mode=activate_mode);
+        return self.getActivation(pooled_out=pooled_out);
 
 class ConvNetRandomWeightsLayer(ConvNetLayer):
     """ConvNet Layer with Random Feedback Weights
@@ -301,24 +297,17 @@ class ConvNetRandomWeightsLayer(ConvNetLayer):
                                                         if_pool=if_pool,
                                                         pool_size=pool_size,
                                                         border_mode=border_mode,
-                                                        activate_mode=activate_mode)
+                                                        activate_mode=activate_mode);
 
+        filter_shape_temp=numpy.asarray(filter_shape);
+        filter_shape_B=(filter_shape_temp[0],
+                        filter_shape_temp[1],
+                        filter_shape_temp[3],
+                        filter_shape_temp[2]);
         self.B = theano.shared(numpy.asarray(rng.uniform(low=-self.bound,
                                                          high=self.bound,
-                                                         size=filter_shape),
+                                                         size=filter_shape_B),
                                              dtype='float32'),
                                borrow=True);
-
-        self.pooled_out_B=self.getConvPool(data_in=self.input,
-                                           filters=self.B,
-                                           filter_shape=self.filter_shape,
-                                           image_shape=self.image_shape,
-                                           bias=self.b,
-                                           if_pool=if_pool,
-                                           pool_size=pool_size,
-                                           border_mode=border_mode);
-
-        self.output_B=self.getInputActivation(self.pooled_out_B,
-                                              activate_mode=self.activate_mode);
 
         self.params=[self.W, self.b, self.B];
