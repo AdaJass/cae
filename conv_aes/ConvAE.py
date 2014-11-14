@@ -221,8 +221,10 @@ class ConvRWAE(object):
         #                                   filters=d_net_out);
         #print d_W_decode.shape;
 
-        d_net_in=T.dot(self.decode_layer.B, d_net_out);
-        print d_net_in.type();
+        d_net_in=self.decode_layer.getConvPoolB(data_in=d_net_out,
+                                                filters=self.decode_layer.B);
+        #T.dot(self.decode_layer.B, d_net_out);
+        #print d_net_in.type();
         d_net_in_delta=d_net_in*self.encode_layer.d_activation(self.encode_layer.pooled_out);
         print d_net_in_delta.type();
         d_b_encode=T.sum(d_net_in_delta, axis=[0,1,2]);

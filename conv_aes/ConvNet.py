@@ -299,11 +299,19 @@ class ConvNetRandomWeightsLayer(ConvNetLayer):
                                                         border_mode=border_mode,
                                                         activate_mode=activate_mode);
 
+        image_shape_temp=numpy.asarray(image_shape);
         filter_shape_temp=numpy.asarray(filter_shape);
-        filter_shape_B=(filter_shape_temp[0],
-                        filter_shape_temp[1],
-                        filter_shape_temp[3],
-                        filter_shape_temp[2]);
+        image_shape_B=(image_shape_temp[0],
+                       filter_shape_temp[0],
+                       image_shape_temp[2]+filter_shape_temp[2]-1,
+                       image_shape_temp[3]+filter_shape_temp[3]-1,);
+        filter_shape_B=(filter_shape_temp[1],
+                        filter_shape_temp[0],
+                        filter_shape_temp[2],
+                        filter_shape_temp[3]);
+        
+        self.image_shape_B=image_shape_B;
+        self.filter_shape_B=filter_shape_B;
         self.B = theano.shared(numpy.asarray(rng.uniform(low=-self.bound,
                                                          high=self.bound,
                                                          size=filter_shape_B),
@@ -311,3 +319,16 @@ class ConvNetRandomWeightsLayer(ConvNetLayer):
                                borrow=True);
 
         self.params=[self.W, self.b, self.B];
+
+    def getConvPoolB(self,
+                     data_in,
+                     filters,
+                     if_pool=False):
+        return self.getConvPool(data_in=data_in,
+                                filters=filters,
+                                filter_shape=self.filter_shape_B,
+                                image_shape=self.image_shape_B,
+                                bias=self.b,
+                                if_pool=if_pool,
+                                pool_size=self.pool_size,
+                                border_mode=self.border_mode);
