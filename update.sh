@@ -5,6 +5,7 @@ now="$(date): update all"
 git add -A README.md
 git add -A update.sh
 git add -A cae_test.py
+git add -A mlp_test.py
 git add -A cae_tools.py
 git add -A conv_aes/*.py
 

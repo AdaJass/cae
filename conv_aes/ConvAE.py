@@ -215,8 +215,13 @@ class ConvRWAE(object):
 
         d_b=T.grad(cost, self.BIAS);
         d_net_out=T.grad(cost, self.decode_layer.pooled_out);
-        d_b_encode=T.sum(d_net_out, axis=[0,1,2]);
-        print d_b_encode.type();
+
+        d_b_decode=T.grad(cost, self.decode_layer.b);
+        d_W_decode=T.grad(cost, self.decode_layer.W);
+        print d_b_decode.type();
+        print d_W_decode.type();
+        #d_b_encode=T.sum(d_net_out, axis=[0,1,2]);
+        #print d_b_encode.type();
         #d_W_decode=self.decode_layer.getCP(data_in=self.encode_layer.output,
         #                                   filters=d_net_out);
         #print d_W_decode.shape;
