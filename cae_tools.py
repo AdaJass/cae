@@ -404,14 +404,6 @@ class RWMLP(object):
         updates=[(param_i, param_i-learning_rate*grad_i)
                  for param_i, grad_i in zip(self.params, gparams)];
 
-        #updates=[(param_i-learning_rate*grad_i)
-        #         for param_i, grad_i in zip(self.params, gparams)];
-
-        #updates=OrderedDict({self.out_layer.W : self.out_layer.W - learning_rate * d_W_2,
-        #                     self.out_layer.b : self.out_layer.b - learning_rate * d_b_2,
-        #                     self.hidden_layer.W : self.hidden_layer.W - learning_rate * d_W_1,
-        #                     self.hidden_layer.b : self.hidden_layer.b - learning_rate * d_b_1})
-        
         return (cost, updates);
 
 
