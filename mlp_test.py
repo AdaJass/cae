@@ -27,6 +27,7 @@ import theano.tensor as T;
 
 from cae_tools import load_data;
 from cae_tools import MLP;
+from cae_tools import RWMLP;
 #from cae_tools import RWMLP;
 from dlt_utils import tile_raster_images;
 
@@ -69,11 +70,17 @@ index=T.lscalar(); # batch index
 x=T.matrix('x');  # input data source
 y=T.ivector('y'); # input data label
 
-mlp=MLP(rng,
-        data_in=x,
-        n_in=n_in,
-        n_hidden=n_hidden,
-        n_out=n_out);
+#mlp=MLP(rng,
+#        data_in=x,
+#        n_in=n_in,
+#        n_hidden=n_hidden,
+#        n_out=n_out);
+
+mlp=RWMLP(rng,
+          data_in=x,
+          n_in=n_in,
+          n_hidden=n_hidden,
+          n_out=n_out);
 
 cost, updates = mlp.get_cost_update(y);
 

@@ -19,6 +19,9 @@ import numpy;
 
 import theano;
 import theano.tensor as T;
+from theano.compat.python2x import OrderedDict
+
+# private library
 import conv_aes.nntool as nnt;
 
 class HiddenLayer(object):
@@ -64,6 +67,8 @@ class HiddenLayer(object):
         elif (self.activate_mode=="softplus"):
             self.activation=nnt.softplus;
             self.d_activation=nnt.d_softplus;
+        elif (self.activate_mode=="softmax"):
+            self.activation=nnt.softmax;
         else:
             raise ValueError("Value %s is not a valid choice of activation function"
                              % self.activate_mode);
@@ -133,20 +138,20 @@ class HiddenRWLayer(HiddenLayer):
         """Follow HiddenLayer's definition
         """
 
-        super(HiddenLayer, self).__init__(rng=rng,
+        super(HiddenRWLayer, self).__init__(rng=rng,
                                           data_in=data_in,
                                           n_in=n_in,
                                           n_out=n_out,
                                           W=W,
                                           b=b,
-                                          activate_mode='tanh');
+                                          activate_mode=activate_mode);
 
-        B_values = numpy.asarray(rng.uniform(low=-numpy.sqrt(6. / (n_in + n_out)),
-                                             high=numpy.sqrt(6. / (n_in + n_out)),
+        B_values = numpy.asarray(rng.uniform(low=-0.1,#-numpy.sqrt(6. / (n_in + n_out)),
+                                             high=0.1,#numpy.sqrt(6. / (n_in + n_out)),
                                              size=(n_out, n_in)),
                                  dtype='float32');
-        if (self.activate_mode=="sigmoid"):
-            B_values *= 4;
+        #if (self.activate_mode=="sigmoid"):
+        #    B_values *= 4;
             
         self.B = theano.shared(value=B_values, name='B', borrow=True);
 
@@ -324,8 +329,90 @@ class MLP(object):
         return (cost, updates);
         
 class RWMLP(object):
-    """MLP 
+    """MLP layer with feedfoward alignment
     """
+
+    def __init__(self,
+                 rng,
+                 data_in,
+                 n_in,
+                 n_hidden,
+                 n_out):
+        """Initialization of MLP network
+        """
+
+        self.input=data_in;
+        self.n_in=n_in;
+        self.n_hidden=n_hidden;
+        self.n_out=n_out;
+
+        self.hidden_layer=HiddenRWLayer(rng,
+                                        data_in=data_in,
+                                        n_in=n_in,
+                                        n_out=n_hidden,
+                                        activate_mode='tanh');
+
+        self.out_layer=HiddenRWLayer(rng,
+                                     data_in=self.hidden_layer.output,
+                                     n_in=n_hidden,
+                                     n_out=n_out,
+                                     activate_mode='softmax');
+
+        self.L1=(abs(self.hidden_layer.W).sum()+abs(self.out_layer.W).sum());
+        self.L2=((self.hidden_layer.W**2).sum()+(self.out_layer.W**2).sum());
+
+        self.pred=self.out_layer.output;
+        self.prediction=T.argmax(self.pred, axis=1);
+
+        self.params=self.hidden_layer.params+self.out_layer.params;
+
+    def errors(self,
+               target):
+        """Get errors
+        """
+
+        return T.mean(T.neq(self.prediction, target));
+
+    def get_cost(self,
+                 target):
+        """Softmax cross entropy
+        """
+
+        return -T.mean(T.log(self.pred)[T.arange(target.shape[0]), target])
+
+    def get_cost_update(self,
+                        target,
+                        L1_reg=0.00,
+                        L2_reg=0.0001,
+                        learning_rate=0.1):
+
+        cost = self.get_cost(target)+L1_reg*self.L1+L2_reg*self.L2;
+
+        d_target_net=T.grad(cost, self.out_layer.lin_output);
+
+        d_b_2=d_target_net.sum(axis=0);
+        d_W_2=T.dot(self.hidden_layer.output.T, d_target_net);
+
+        d_H_1=T.dot(d_target_net, self.out_layer.B);
+        d_H1_net=d_H_1*self.hidden_layer.d_activation(self.hidden_layer.lin_output);
+
+        d_b_1=d_H1_net.sum(axis=0);
+        d_W_1=T.dot(self.input.T, d_H1_net);
+
+        gparams=[d_W_1, d_b_1, d_W_2, d_b_2];
+
+        updates=[(param_i, param_i-learning_rate*grad_i)
+                 for param_i, grad_i in zip(self.params, gparams)];
+
+        #updates=[(param_i-learning_rate*grad_i)
+        #         for param_i, grad_i in zip(self.params, gparams)];
+
+        #updates=OrderedDict({self.out_layer.W : self.out_layer.W - learning_rate * d_W_2,
+        #                     self.out_layer.b : self.out_layer.b - learning_rate * d_b_2,
+        #                     self.hidden_layer.W : self.hidden_layer.W - learning_rate * d_W_1,
+        #                     self.hidden_layer.b : self.hidden_layer.b - learning_rate * d_b_1})
+        
+        return (cost, updates);
 
 
 

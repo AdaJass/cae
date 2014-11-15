@@ -87,3 +87,15 @@ def d_softplus(x):
         input of the function
     """
     return sigmoid(x);
+
+def softmax(x):
+    """Softmax function
+
+    A softmax function
+
+    Parameters
+    ----------
+    x : theano tensor
+        input of the function
+    """
+    return T.nnet.softmax(x);
