@@ -134,6 +134,7 @@ class HiddenRWLayer(HiddenLayer):
                  n_out,
                  W=None,
                  b=None,
+                 B_limits=0.1,
                  activate_mode='tanh'):
         """Follow HiddenLayer's definition
         """
@@ -146,13 +147,12 @@ class HiddenRWLayer(HiddenLayer):
                                           b=b,
                                           activate_mode=activate_mode);
 
-        B_values = numpy.asarray(rng.uniform(low=-0.1,#-numpy.sqrt(6. / (n_in + n_out)),
-                                             high=0.1,#numpy.sqrt(6. / (n_in + n_out)),
+        B_values = numpy.asarray(rng.uniform(low=-1*B_limits,#-numpy.sqrt(6. / (n_in + n_out)),
+                                             high=B_limits,#numpy.sqrt(6. / (n_in + n_out)),
                                              size=(n_out, n_in)),
                                  dtype='float32');
         #if (self.activate_mode=="sigmoid"):
         #    B_values *= 4;
-            
         self.B = theano.shared(value=B_values, name='B', borrow=True);
 
         self.params=[self.W, self.b];
@@ -284,7 +284,11 @@ class MLP(object):
                  data_in,
                  n_in,
                  n_hidden,
-                 n_out):
+                 n_out,
+                 W_hidden=None,
+                 b_hidden=None,
+                 W_out=None,
+                 b_out=None):
         """Initialization of MLP network
         """
 
@@ -297,19 +301,49 @@ class MLP(object):
                                       data_in=self.input,
                                       n_in=self.n_in,
                                       n_out=self.n_hidden,
+                                      W=W_hidden,
+                                      b=b_hidden,
                                       activate_mode='tanh');
 
-        self.logReg_layer=LogisticRegression(data_in=self.hidden_layer.output,
-                                             n_in=self.n_hidden,
-                                             n_out=self.n_out);
+        self.out_layer=HiddenLayer(rng,
+                                   data_in=self.hidden_layer.output,
+                                   n_in=n_hidden,
+                                   n_out=n_out,
+                                   W=W_out,
+                                   b=b_out,
+                                   activate_mode='softmax');
 
-        self.L1=(abs(self.hidden_layer.W).sum()+abs(self.logReg_layer.W).sum());
-        self.L2=((self.hidden_layer.W**2).sum()+(self.logReg_layer.W**2).sum());
+        #self.logReg_layer=LogisticRegression(data_in=self.hidden_layer.output,
+        #                                     n_in=self.n_hidden,
+        #                                     n_out=self.n_out);
 
-        self.negative_log_likelihood=self.logReg_layer.negative_log_likelihood;
-        self.errors=self.logReg_layer.errors;
+        #self.L1=(abs(self.hidden_layer.W).sum()+abs(self.logReg_layer.W).sum());
+        #self.L2=((self.hidden_layer.W**2).sum()+(self.logReg_layer.W**2).sum());
 
-        self.params=self.hidden_layer.params+self.logReg_layer.params;
+        self.L1=(abs(self.hidden_layer.W).sum()+abs(self.out_layer.W).sum());
+        self.L2=((self.hidden_layer.W**2).sum()+(self.out_layer.W**2).sum());
+
+        self.pred=self.out_layer.output;
+        self.prediction=T.argmax(self.pred, axis=1);
+
+        #self.negative_log_likelihood=self.logReg_layer.negative_log_likelihood;
+        #self.errors=self.logReg_layer.errors;
+
+        self.params=self.hidden_layer.params+self.out_layer.params;
+
+    def errors(self,
+               target):
+        """Get errors
+        """
+
+        return T.mean(T.neq(self.prediction, target));
+
+    def get_cost(self,
+                 target):
+        """Softmax cross entropy
+        """
+
+        return -T.mean(T.log(self.pred)[T.arange(target.shape[0]), target]);
 
     def get_cost_update(self,
                         target,
@@ -319,7 +353,8 @@ class MLP(object):
         """Get cost and update
         """
 
-        cost=self.negative_log_likelihood(target)+L1_reg*self.L1+L2_reg*self.L2;
+        #cost=self.negative_log_likelihood(target)+L1_reg*self.L1+L2_reg*self.L2;
+        cost = self.get_cost(target)+L1_reg*self.L1+L2_reg*self.L2;
 
         gparams=T.grad(cost, self.params);
 
@@ -337,7 +372,13 @@ class RWMLP(object):
                  data_in,
                  n_in,
                  n_hidden,
-                 n_out):
+                 n_out,
+                 W_hidden=None,
+                 b_hidden=None,
+                 B_hidden_limits=0.1,
+                 W_out=None,
+                 b_out=None,
+                 B_out_limits=0.1):
         """Initialization of MLP network
         """
 
@@ -350,12 +391,18 @@ class RWMLP(object):
                                         data_in=data_in,
                                         n_in=n_in,
                                         n_out=n_hidden,
+                                        W=W_hidden,
+                                        b=b_hidden,
+                                        B_limits=B_hidden_limits,
                                         activate_mode='tanh');
 
         self.out_layer=HiddenRWLayer(rng,
                                      data_in=self.hidden_layer.output,
                                      n_in=n_hidden,
                                      n_out=n_out,
+                                     W=W_out,
+                                     b=b_out,
+                                     B_limits=B_out_limits,
                                      activate_mode='softmax');
 
         self.L1=(abs(self.hidden_layer.W).sum()+abs(self.out_layer.W).sum());
@@ -378,7 +425,7 @@ class RWMLP(object):
         """Softmax cross entropy
         """
 
-        return -T.mean(T.log(self.pred)[T.arange(target.shape[0]), target])
+        return -T.mean(T.log(self.pred)[T.arange(target.shape[0]), target]);
 
     def get_cost_update(self,
                         target,
