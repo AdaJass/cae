@@ -36,6 +36,7 @@ def mlp_model(n_in,
               n_hidden,
               n_out,
               dataset='data/mnist.pkl.gz',
+              training_portion=1,
               batch_size=20,
               n_epochs=1000,
               learning_rate=0.1,
@@ -52,7 +53,7 @@ def mlp_model(n_in,
     valid_set_x, valid_set_y = datasets[1];
     test_set_x, test_set_y = datasets[2];
     
-    n_train_batches=train_set_x.get_value(borrow=True).shape[0];
+    n_train_batches=int(train_set_x.get_value(borrow=True).shape[0]*training_portion);
     n_valid_batches=valid_set_x.get_value(borrow=True).shape[0];
     n_test_batches=test_set_x.get_value(borrow=True).shape[0];
     
@@ -196,6 +197,69 @@ def mlp_model(n_in,
     return mlp_validation_record, mlp_test_record, rwmlp_validation_record, rwmlp_test_record;
 
 
+
+## compare result between different training samples
+
+n_epochs=200;
+step=0.004;
+n_steps=int(1/step);
+
+best_mlp_cv=numpy.zeros((n_steps,1));
+best_mlp_test=numpy.zeros((n_steps, 1));
+best_rwmlp_cv=numpy.zeros((n_steps, 1));
+best_rwmlp_test=numpy.zeros((n_steps, 1));
+
+for training_portion in xrange(n_steps):
+    tp=(training_portion+1)*step;
+    print (('Interation %d of %d') % (training_portion+1,n_steps));
+
+    # training model
+    mlp_cv_record, mlp_test_record, rwmlp_cv_record, rwmlp_test_record=mlp_model(n_in=28*28,
+                                                                                 n_hidden=1000,
+                                                                                 n_out=10,
+                                                                                 dataset='data/mnist.pkl.gz',
+                                                                                 training_portion=tp,
+                                                                                 batch_size=20,
+                                                                                 n_epochs=n_epochs,
+                                                                                 learning_rate=0.1,
+                                                                                 L1_reg=0.00,
+                                                                                 L2_reg=0.0001,
+                                                                                 hidden_limits=0.1,
+                                                                                 out_limits=0.1);
+
+    # get best result
+
+    mlp_index=numpy.argmin(mlp_test_record);
+    best_mlp_cv[training_portion]=mlp_cv_record[mlp_index];
+    best_mlp_test[training_portion]=mlp_test_record[mlp_index];
+
+    rwmlp_index=numpy.argmin(rwmlp_test_record);
+    best_rwmlp_cv[training_portion]=rwmlp_cv_record[rwmlp_index];
+    best_rwmlp_test[training_portion]=rwmlp_test_record[rwmlp_index];
+
+
+
+# display result
+
+x=numpy.linspace(0, n_steps-1, n_steps);
+
+plt.figure(1);
+
+mlp_cv_g,=plt.plot(x, best_mlp_cv, 'b', label='MLP validation error')
+mlp_test_g,=plt.plot(x, best_mlp_test, 'r', label='MLP testing error')
+rwmlp_cv_g,=plt.plot(x, best_rwmlp_cv, 'g', label='RWMLP validation error')
+rwmlp_test_g,=plt.plot(x, best_rwmlp_test,'black', label='RWMLP testing error')
+
+plt.legend(handles=[mlp_cv_g, mlp_test_g, rwmlp_cv_g, rwmlp_test_g]);
+
+plt.xlabel(("Training samples (*%d samples)") % int(50000/n_steps));
+plt.ylabel("Error (%)");
+plt.axis([0,n_steps-1, 0, 0.5]);
+
+plt.savefig('mlp_rwmlp_comp_train_samples.png');
+plt.savefig('mlp_rwmlp_comp_train_samples.eps');
+    
+## compare result between different epochs
 n_epochs=300;
 mlp_cv_record, mlp_test_record, rwmlp_cv_record, rwmlp_test_record=mlp_model(n_in=28*28,
                                                                              n_hidden=1000,
@@ -211,8 +275,8 @@ mlp_cv_record, mlp_test_record, rwmlp_cv_record, rwmlp_test_record=mlp_model(n_i
 
 x=numpy.linspace(0, n_epochs-1, n_epochs);
 
-
-plt.figure(1);
+# plot the result
+plt.figure(2);
 
 mlp_cv_g,=plt.plot(x, mlp_cv_record, 'b', label='MLP validation error')
 mlp_test_g,=plt.plot(x, mlp_test_record, 'r', label='MLP testing error')
@@ -222,10 +286,8 @@ rwmlp_test_g,=plt.plot(x, rwmlp_test_record,'black', label='RWMLP testing error'
 plt.legend(handles=[mlp_cv_g, mlp_test_g, rwmlp_cv_g, rwmlp_test_g]);
 
 plt.xlabel("Training epochs");
-plt.ylabel("Error (%%)");
+plt.ylabel("Error (%)");
 plt.axis([0,n_epochs-1, 0, 0.15]);
 
 plt.savefig('mlp_rwmlp_comp.png');
 plt.savefig('mlp_rwmlp_comp.eps');
-
-plt.show();
