@@ -1,5 +1,7 @@
 #!/bin/sh
 
+git pull origin master
+
 now="$(date): update all"
 
 git add -A README.md
