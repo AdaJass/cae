@@ -20,6 +20,11 @@ except ImportError:
 # public library modules
 
 import numpy;
+
+## if have only CLI, enable following two lines
+#import matplotlib
+#matplotlib.use('Agg');
+
 import matplotlib.pyplot as plt;
 import theano;
 import theano.tensor as T;
@@ -29,173 +34,70 @@ import theano.tensor as T;
 from cae_tools import load_data;
 from cae_tools import MLP;
 from cae_tools import RWMLP;
-#from cae_tools import RWMLP;
 from dlt_utils import tile_raster_images;
+from mlp_model import mlp_model;
 
-def mlp_model(n_in,
-              n_hidden,
-              n_out,
-              dataset='data/mnist.pkl.gz',
-              training_portion=1,
-              batch_size=20,
-              n_epochs=1000,
-              learning_rate=0.1,
-              L1_reg=0.00,
-              L2_reg=0.0001,
-              hidden_limits=0.1,
-              out_limits=0.1):
+## compare result between different noise
 
-    datasets=load_data(dataset);
-    rng=numpy.random.RandomState(23455);
+noise_level=numpy.asarray([0.0001, 0.001, 0.01, 0.05, 0.1, 0.125, 0.15, 0.2, 0.25]);
+n_epochs=200;
+n_steps=9;
+best_noisy_mlp_cv=numpy.zeros((n_steps,1));
+best_noisy_mlp_test=numpy.zeros((n_steps, 1));
+best_noisy_rwmlp_cv=numpy.zeros((n_steps, 1));
+best_noisy_rwmlp_test=numpy.zeros((n_steps, 1));
 
-    ### Loading and preparing dataset
-    train_set_x, train_set_y = datasets[0];
-    valid_set_x, valid_set_y = datasets[1];
-    test_set_x, test_set_y = datasets[2];
-    
-    n_train_batches=int(train_set_x.get_value(borrow=True).shape[0]*training_portion);
-    n_valid_batches=valid_set_x.get_value(borrow=True).shape[0];
-    n_test_batches=test_set_x.get_value(borrow=True).shape[0];
-    
-    n_train_batches /= batch_size; # number of train data batches
-    n_valid_batches /= batch_size; # number of valid data batches
-    n_test_batches /= batch_size;  # number of test data batches
+noise_training_iter=0
+for noise in noise_level:
+    print (('Interation %d of %d') % (noise_training_iter+1,n_steps));
 
-    print "... Build the model"
+    mlp_cv_record, mlp_test_record, rwmlp_cv_record, rwmlp_test_record=mlp_model(n_in=28*28,
+                                                                                 n_hidden=1000,
+                                                                                 n_out=10,
+                                                                                 dataset='data/mnist.pkl.gz',
+                                                                                 batch_size=20,
+                                                                                 n_epochs=n_epochs,
+                                                                                 learning_rate=0.1,
+                                                                                 L1_reg=0.00,
+                                                                                 L2_reg=0.0001,
+                                                                                 hidden_limits=noise,
+                                                                                 out_limits=noise);
 
-    index=T.lscalar(); # batch index
-    
-    x=T.matrix('x');  # input data source
-    y=T.ivector('y'); # input data label
+    # get best result
 
-    mlp=MLP(rng,
-            data_in=x,
-            n_in=n_in,
-            n_hidden=n_hidden,
-            n_out=n_out);
-    
-    rwmlp=RWMLP(rng,
-                data_in=x,
-                n_in=n_in,
-                n_hidden=n_hidden,
-                n_out=n_out,
-                B_hidden_limits=hidden_limits,
-                B_out_limits=out_limits);
+    mlp_index=numpy.argmin(mlp_test_record);
+    best_noisy_mlp_cv[noise_training_iter]=mlp_cv_record[mlp_index];
+    best_noisy_mlp_test[noise_training_iter]=mlp_test_record[mlp_index];
+
+    rwmlp_index=numpy.argmin(rwmlp_test_record);
+    best_noisy_rwmlp_cv[noise_training_iter]=rwmlp_cv_record[rwmlp_index];
+    best_noisy_rwmlp_test[noise_training_iter]=rwmlp_test_record[rwmlp_index];
+
+    noise_training_iter=noise_training_iter+1;
+
+numpy.savetxt('mlp_rwmlp_noise_diff.txt', (best_noisy_mlp_cv, best_noisy_mlp_test, best_noisy_rwmlp_cv, best_noisy_rwmlp_test));
 
 
-    ## MLP model
-    mlp_cost, mlp_updates = mlp.get_cost_update(y);
+plt.figure(1);
+idx=numpy.arange(n_steps);
+width=0.4;
 
-    mlp_test_model = theano.function(inputs=[index],
-                                     outputs=mlp.errors(y),
-                                     givens={x: test_set_x[index * batch_size:(index + 1) * batch_size],
-                                             y: test_set_y[index * batch_size:(index + 1) * batch_size]});
-    
-    mlp_validate_model = theano.function(inputs=[index],
-                                         outputs=mlp.errors(y),
-                                         givens={x: valid_set_x[index * batch_size:(index + 1) * batch_size],
-                                                 y: valid_set_y[index * batch_size:(index + 1) * batch_size]});
-    
-    mlp_train_model = theano.function(inputs=[index],
-                                      outputs=mlp_cost,
-                                      updates=mlp_updates,
-                                      givens={x: train_set_x[index * batch_size: (index + 1) * batch_size],
-                                              y: train_set_y[index * batch_size: (index + 1) * batch_size]});
+bnrc_g=plt.barh(idx, best_noisy_mlp_test*100, width, color='y');
+bnrt_g=plt.barh(idx+width, best_noisy_rwmlp_test*100, width, color='g');
+bnrcl_g=plt.plot(best_noisy_mlp_test*100, idx+width/2, color='y', linewidth=2);
+bnrcl_g=plt.plot(best_noisy_rwmlp_test*100, idx+width+width/2, color='g', linewidth=2);
 
-    ## RWMLP model
+plt.xlabel('Error (%)');
+plt.ylabel('Random weight');
+plt.yticks(idx+width, noise_level);
+plt.xticks(numpy.arange(7));
 
-    rwmlp_cost, rwmlp_updates = rwmlp.get_cost_update(y);
+plt.legend((bnrc_g[0], bnrt_g[0]), ('MLP testing error', 'RWMLP testing error'));
 
-    rwmlp_test_model = theano.function(inputs=[index],
-                                       outputs=rwmlp.errors(y),
-                                       givens={x: test_set_x[index * batch_size:(index + 1) * batch_size],
-                                               y: test_set_y[index * batch_size:(index + 1) * batch_size]});
-    
-    rwmlp_validate_model = theano.function(inputs=[index],
-                                           outputs=rwmlp.errors(y),
-                                           givens={x: valid_set_x[index * batch_size:(index + 1) * batch_size],
-                                                   y: valid_set_y[index * batch_size:(index + 1) * batch_size]});
-    
-    rwmlp_train_model = theano.function(inputs=[index],
-                                        outputs=rwmlp_cost,
-                                        updates=rwmlp_updates,
-                                        givens={x: train_set_x[index * batch_size: (index + 1) * batch_size],
-                                                y: train_set_y[index * batch_size: (index + 1) * batch_size]});
+plt.savefig('mlp_rwmlp_comp_error_diff.png');
+plt.savefig('mlp_rwmlp_comp_error_diff.eps');
 
-    print "... training"
-
-    validation_frequency = n_train_batches;
-    start_time = time.clock();
-
-    mlp_validation_record=numpy.zeros((n_epochs, 1));
-    mlp_test_record=numpy.zeros((n_epochs, 1));
-
-    rwmlp_validation_record=numpy.zeros((n_epochs, 1));
-    rwmlp_test_record=numpy.zeros((n_epochs, 1));
-    
-    epoch = 0;
-    while (epoch < n_epochs):
-        epoch = epoch + 1;
-        for minibatch_index in xrange(n_train_batches):
-        
-            mlp_minibatch_avg_cost = mlp_train_model(minibatch_index);
-            iter = (epoch - 1) * n_train_batches + minibatch_index;
-        
-            if (iter + 1) % validation_frequency == 0:
-                # compute zero-one loss on validation set
-
-                # MLP model loss
-                mlp_validation_losses = [mlp_validate_model(i) for i
-                                         in xrange(n_valid_batches)];
-                mlp_validation_record[epoch-1] = numpy.mean(mlp_validation_losses);
-
-                print 'MLP MODEL';
-            
-                print('epoch %i, minibatch %i/%i, validation error %f %%' %
-                      (epoch, minibatch_index + 1, n_train_batches, mlp_validation_record[epoch-1] * 100.));
-
-                mlp_test_losses = [mlp_test_model(i) for i
-                                   in xrange(n_test_batches)];
-                mlp_test_record[epoch-1] = numpy.mean(mlp_test_losses);
-                
-                print(('     epoch %i, minibatch %i/%i, test error %f %%') %
-                      (epoch, minibatch_index + 1, n_train_batches, mlp_test_record[epoch-1] * 100.));
-
-    epoch = 0;
-    while (epoch < n_epochs):
-        epoch = epoch + 1;
-        for minibatch_index in xrange(n_train_batches):
-        
-            rwmlp_minibatch_avg_cost = rwmlp_train_model(minibatch_index);
-            iter = (epoch - 1) * n_train_batches + minibatch_index;
-        
-            if (iter + 1) % validation_frequency == 0:
-                # compute zero-one loss on validation set
-
-                # RWMLP model loss
-                rwmlp_validation_losses = [rwmlp_validate_model(i) for i
-                                           in xrange(n_valid_batches)];
-                rwmlp_validation_record[epoch-1] = numpy.mean(rwmlp_validation_losses);
-
-                print 'RWMLP MODEL';
-                print('epoch %i, minibatch %i/%i, validation error %f %%' %
-                      (epoch, minibatch_index + 1, n_train_batches, rwmlp_validation_record[epoch-1] * 100.));
-
-                rwmlp_test_losses = [rwmlp_test_model(i) for i
-                                     in xrange(n_test_batches)];
-                rwmlp_test_record[epoch-1] = numpy.mean(rwmlp_test_losses);
-                
-                print(('     epoch %i, minibatch %i/%i, test error %f %%') %
-                      (epoch, minibatch_index + 1, n_train_batches, rwmlp_test_record[epoch-1] * 100.));
-                        
-    end_time = time.clock();
-
-    print >> sys.stderr, ('The code for file ' +
-                          os.path.split(__file__)[1] +
-                          ' ran for %.2fm' % ((end_time - start_time) / 60.));
-
-    return mlp_validation_record, mlp_test_record, rwmlp_validation_record, rwmlp_test_record;
-
+plt.show();
 
 
 ## compare result between different training samples
@@ -243,7 +145,7 @@ for training_portion in xrange(n_steps):
 
 x=numpy.linspace(0, n_steps-1, n_steps);
 
-plt.figure(1);
+plt.figure(2);
 
 mlp_cv_g,=plt.plot(x, best_mlp_cv, 'b', label='MLP validation error')
 mlp_test_g,=plt.plot(x, best_mlp_test, 'r', label='MLP testing error')
@@ -276,7 +178,7 @@ mlp_cv_record, mlp_test_record, rwmlp_cv_record, rwmlp_test_record=mlp_model(n_i
 x=numpy.linspace(0, n_epochs-1, n_epochs);
 
 # plot the result
-plt.figure(2);
+plt.figure(3);
 
 mlp_cv_g,=plt.plot(x, mlp_cv_record, 'b', label='MLP validation error')
 mlp_test_g,=plt.plot(x, mlp_test_record, 'r', label='MLP testing error')
