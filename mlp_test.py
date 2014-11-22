@@ -37,6 +37,39 @@ from cae_tools import RWMLP;
 from dlt_utils import tile_raster_images;
 from mlp_model import mlp_model;
 
+## compare learned feature from different model
+
+n_epochs=300;
+(mlp,
+ rwmlp,
+ mlp_cv_record,
+ mlp_test_record,
+ rwmlp_cv_record,
+ rwmlp_test_record)=mlp_model(n_in=28*28,
+                              n_hidden=1000,
+                              n_out=10,
+                              dataset='data/mnist.pkl.gz',
+                              batch_size=20,
+                              n_epochs=n_epochs,
+                              learning_rate=0.1,
+                              L1_reg=0.00,
+                              L2_reg=0.0001,
+                              hidden_limits=0.25,
+                              out_limits=0.25);
+
+image = Image.fromarray(tile_raster_images(X=mlp.hidden_layer.W.get_value(borrow=True).T,
+                                           img_shape=(28, 28), tile_shape=(10, 10),
+                                           tile_spacing=(1, 1)));
+
+image.save('mlp_learned_feature.png');
+
+image = Image.fromarray(tile_raster_images(X=rwmlp.hidden_layer.W.get_value(borrow=True).T,
+                                           img_shape=(28, 28), tile_shape=(10, 10),
+                                           tile_spacing=(1, 1)));
+
+image.save('rwmlp_learned_feature.png');
+
+
 ## compare result between different noise
 
 noise_level=numpy.asarray([0.0001, 0.001, 0.01, 0.05, 0.1, 0.125, 0.15, 0.2, 0.25]);
@@ -51,17 +84,22 @@ noise_training_iter=0
 for noise in noise_level:
     print (('Interation %d of %d') % (noise_training_iter+1,n_steps));
 
-    mlp_cv_record, mlp_test_record, rwmlp_cv_record, rwmlp_test_record=mlp_model(n_in=28*28,
-                                                                                 n_hidden=1000,
-                                                                                 n_out=10,
-                                                                                 dataset='data/mnist.pkl.gz',
-                                                                                 batch_size=20,
-                                                                                 n_epochs=n_epochs,
-                                                                                 learning_rate=0.1,
-                                                                                 L1_reg=0.00,
-                                                                                 L2_reg=0.0001,
-                                                                                 hidden_limits=noise,
-                                                                                 out_limits=noise);
+    (mlp,
+     rwmlp,
+     mlp_cv_record,
+     mlp_test_record,
+     rwmlp_cv_record,
+     rwmlp_test_record)=mlp_model(n_in=28*28,
+                                  n_hidden=1000,
+                                  n_out=10,
+                                  dataset='data/mnist.pkl.gz',
+                                  batch_size=20,
+                                  n_epochs=n_epochs,
+                                  learning_rate=0.1,
+                                  L1_reg=0.00,
+                                  L2_reg=0.0001,
+                                  hidden_limits=noise,
+                                  out_limits=noise);
 
     # get best result
 
@@ -75,7 +113,10 @@ for noise in noise_level:
 
     noise_training_iter=noise_training_iter+1;
 
-numpy.savetxt('mlp_rwmlp_noise_diff.txt', (best_noisy_mlp_cv, best_noisy_mlp_test, best_noisy_rwmlp_cv, best_noisy_rwmlp_test));
+numpy.savetxt('mlp_rwmlp_noise_diff.txt', (best_noisy_mlp_cv,
+                                           best_noisy_mlp_test,
+                                           best_noisy_rwmlp_cv,
+                                           best_noisy_rwmlp_test));
 
 
 plt.figure(1);
@@ -102,6 +143,10 @@ plt.show();
 
 ## compare result between different training samples
 
+## probably take you forever to run if you have too many steps.
+## you can divide the work and depoly them to different cloud instance
+## it will make it much more faster
+
 n_epochs=200;
 step=0.004;
 n_steps=int(1/step);
@@ -116,18 +161,23 @@ for training_portion in xrange(n_steps):
     print (('Interation %d of %d') % (training_portion+1,n_steps));
 
     # training model
-    mlp_cv_record, mlp_test_record, rwmlp_cv_record, rwmlp_test_record=mlp_model(n_in=28*28,
-                                                                                 n_hidden=1000,
-                                                                                 n_out=10,
-                                                                                 dataset='data/mnist.pkl.gz',
-                                                                                 training_portion=tp,
-                                                                                 batch_size=20,
-                                                                                 n_epochs=n_epochs,
-                                                                                 learning_rate=0.1,
-                                                                                 L1_reg=0.00,
-                                                                                 L2_reg=0.0001,
-                                                                                 hidden_limits=0.1,
-                                                                                 out_limits=0.1);
+    (mlp,
+     rwmlp,
+     mlp_cv_record,
+     mlp_test_record,
+     rwmlp_cv_record,
+     rwmlp_test_record)=mlp_model(n_in=28*28,
+                                  n_hidden=1000,
+                                  n_out=10,
+                                  dataset='data/mnist.pkl.gz',
+                                  training_portion=tp,
+                                  batch_size=20,
+                                  n_epochs=n_epochs,
+                                  learning_rate=0.1,
+                                  L1_reg=0.00,
+                                  L2_reg=0.0001,
+                                  hidden_limits=0.1,
+                                  out_limits=0.1);
 
     # get best result
 
@@ -138,8 +188,6 @@ for training_portion in xrange(n_steps):
     rwmlp_index=numpy.argmin(rwmlp_test_record);
     best_rwmlp_cv[training_portion]=rwmlp_cv_record[rwmlp_index];
     best_rwmlp_test[training_portion]=rwmlp_test_record[rwmlp_index];
-
-
 
 # display result
 
@@ -163,17 +211,22 @@ plt.savefig('mlp_rwmlp_comp_train_samples.eps');
     
 ## compare result between different epochs
 n_epochs=300;
-mlp_cv_record, mlp_test_record, rwmlp_cv_record, rwmlp_test_record=mlp_model(n_in=28*28,
-                                                                             n_hidden=1000,
-                                                                             n_out=10,
-                                                                             dataset='data/mnist.pkl.gz',
-                                                                             batch_size=20,
-                                                                             n_epochs=n_epochs,
-                                                                             learning_rate=0.1,
-                                                                             L1_reg=0.00,
-                                                                             L2_reg=0.0001,
-                                                                             hidden_limits=0.1,
-                                                                             out_limits=0.1);
+(mlp,
+ rwmlp,
+ mlp_cv_record,
+ mlp_test_record,
+ rwmlp_cv_record,
+ rwmlp_test_record)=mlp_model(n_in=28*28,
+                              n_hidden=1000,
+                              n_out=10,
+                              dataset='data/mnist.pkl.gz',
+                              batch_size=20,
+                              n_epochs=n_epochs,
+                              learning_rate=0.1,
+                              L1_reg=0.00,
+                              L2_reg=0.0001,
+                              hidden_limits=0.1,
+                              out_limits=0.1);
 
 x=numpy.linspace(0, n_epochs-1, n_epochs);
 

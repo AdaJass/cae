@@ -185,4 +185,4 @@ def mlp_model(n_in,
                           os.path.split(__file__)[1] +
                           ' ran for %.2fm' % ((end_time - start_time) / 60.));
 
-    return mlp_validation_record, mlp_test_record, rwmlp_validation_record, rwmlp_test_record;
+    return mlp, rwmlp, mlp_validation_record, mlp_test_record, rwmlp_validation_record, rwmlp_test_record;
